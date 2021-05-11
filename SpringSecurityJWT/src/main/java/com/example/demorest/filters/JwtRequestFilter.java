@@ -8,6 +8,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -27,7 +31,26 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 			throws ServletException, IOException {
 		String authHeader = request.getHeader("Authorization");
 		
+		String username = null;
+		String jwt = null;
 		
+		if(authHeader != null && authHeader.startsWith("Bearer ")) {//get jwt token from the header
+			jwt = authHeader.substring(7);
+			username = jwtUtil.extractUsername(jwt); //jwt token extract the user name
+		}
+		
+		if(username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+			UserDetails userDetails = this.myUserDetailsService.loadUserByUsername(username); //create user details obj
+			if(jwtUtil.validateToken(jwt, userDetails)) {
+				UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =  //if token is valid create authentication token
+						new UsernamePasswordAuthenticationToken(userDetails,null,userDetails.getAuthorities());
+				usernamePasswordAuthenticationToken
+					.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+				SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken); //authenticate user and allow inside
+			}
+			
+		}
+		filterChain.doFilter(request, response); //filtereing the user if he's authentic
 		
 		
 	}
